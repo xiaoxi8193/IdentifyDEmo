@@ -1,6 +1,8 @@
 package com.example.identifydemo;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.FileProvider;
 
 import android.Manifest;
 import android.app.ProgressDialog;
@@ -15,20 +17,19 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
-import android.support.v4.app.ActivityCompat;
-import android.support.v4.content.FileProvider;
 import android.util.Log;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.huawei.hiai.vision.common.ConnectionCallback;
-import com.huawei.hiai.vision.common.VisionBase;
-import com.huawei.hiai.vision.common.VisionImage;
-import com.huawei.hiai.vision.text.CardDetector;
-import com.huawei.hiai.vision.visionkit.text.IDCard;
-import com.huawei.hiai.vision.visionkit.text.config.VisionCardConfiguration;
+import com.huawei.hiai.pdk.resultcode.HwHiAIResultCode; // 加载引擎状态类
+import com.huawei.hiai.vision.common.ConnectionCallback;// 加载连接服务的回调函数
+import com.huawei.hiai.vision.common.VisionBase;// 加载连接服务的静态类
+import com.huawei.hiai.vision.common.VisionImage;// 加载VisionImage类
+import com.huawei.hiai.vision.text.CardDetector;// 加载卡证检测类
+import com.huawei.hiai.vision.visionkit.text.IDCard;// 加载身份证结果类
+import com.huawei.hiai.vision.visionkit.text.config.VisionCardConfiguration;// 加载设置类
 
 import java.io.File;
 import java.lang.ref.WeakReference;
@@ -42,9 +43,13 @@ public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "OCR_Detect";
 
-    private ImageView ivImage;
+    private static final int REQUEST_IMAGE_TAKE = 100;
 
-    private TextView tvResult;
+    private static final int REQUEST_IMAGE_SELECT = 200;
+
+    private static final int REQUEST_PERMISSION_CODE = 300;
+
+    private ImageView ivImage;
 
     private Uri fileUri;
 
@@ -54,11 +59,7 @@ public class MainActivity extends AppCompatActivity {
 
     private CardDetector cardDetector;
 
-    private static final int REQUEST_IMAGE_TAKE = 100;
-
-    private static final int REQUEST_IMAGE_SELECT = 200;
-
-    private static final int REQUEST_PERMISSION_CODE = 300;
+    private TextView tvResult;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -86,19 +87,6 @@ public class MainActivity extends AppCompatActivity {
                 Log.e(TAG, " onServiceDisconnect");
             }
         });
-    }
-
-    private void requestPermissions() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            int permission1 = ActivityCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE);
-            int permission2 = ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA);
-            if (permission1 != PackageManager.PERMISSION_GRANTED || permission2 != PackageManager.PERMISSION_GRANTED) {
-                ActivityCompat.requestPermissions(this,
-                        new String[] {Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.READ_EXTERNAL_STORAGE,
-                                Manifest.permission.CAMERA},
-                        REQUEST_PERMISSION_CODE);
-            }
-        }
     }
 
     /**
@@ -178,6 +166,46 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private void showDialog() {
+        if (dialog == null) {
+            dialog = new ProgressDialog(MainActivity.this);
+            dialog.setTitle("Predicting...");
+            dialog.setMessage("Wait for one sec...");
+            dialog.setIndeterminate(true);
+        }
+        dialog.show();
+    }
+
+    private void dismissDialog() {
+        if (dialog != null && dialog.isShowing()) {
+            dialog.dismiss();
+        }
+    }
+
+    /**
+     * 根据返回的Intent获取图片的路径
+     * @param data Intent
+     * @return 图片路径
+     */
+    protected String getImagePathForSelectImage(Intent data) {
+        Uri selectedImage = data.getData();
+        if (selectedImage == null) {
+            Log.e(TAG, "getImagePathForSelectImage error selectedImage is null");
+            return null;
+        }
+        String[] filePathColumn = {MediaStore.Images.Media.DATA};
+        Cursor cursor = this.getContentResolver().query(selectedImage, filePathColumn, null, null, null);
+        if (cursor == null) {
+            Log.e(TAG, "getImagePathForSelectImage error cursor is null");
+            return null;
+        }
+        cursor.moveToFirst();
+        int columnIndex = cursor.getColumnIndex(filePathColumn[0]);
+        String imgPath = cursor.getString(columnIndex);
+        cursor.close();
+        return imgPath;
+    }
+
     /**
      * 生成拍摄照片保存的uri
      * @param typeName 子路径名
@@ -208,43 +236,16 @@ public class MainActivity extends AppCompatActivity {
         return mediaFile;
     }
 
-    /**
-     * 根据返回的Intent获取图片的路径
-     * @param data Intent
-     * @return 图片路径
-     */
-    protected String getImagePathForSelectImage(Intent data) {
-        Uri selectedImage = data.getData();
-        if (selectedImage == null) {
-            Log.e(TAG, "getImagePathForSelectImage error selectedImage is null");
-            return null;
-        }
-        String[] filePathColumn = {MediaStore.Images.Media.DATA};
-        Cursor cursor = this.getContentResolver().query(selectedImage, filePathColumn, null, null, null);
-        if (cursor == null) {
-            Log.e(TAG, "getImagePathForSelectImage error cursor is null");
-            return null;
-        }
-        cursor.moveToFirst();
-        int columnIndex = cursor.getColumnIndex(filePathColumn[0]);
-        String imgPath = cursor.getString(columnIndex);
-        cursor.close();
-        return imgPath;
-    }
-
-    private void showDialog() {
-        if (dialog == null) {
-            dialog = new ProgressDialog(MainActivity.this);
-            dialog.setTitle("Predicting...");
-            dialog.setMessage("Wait for one sec...");
-            dialog.setIndeterminate(true);
-        }
-        dialog.show();
-    }
-
-    private void dismissDialog() {
-        if (dialog != null && dialog.isShowing()) {
-            dialog.dismiss();
+    private void requestPermissions() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            int permission1 = ActivityCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE);
+            int permission2 = ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA);
+            if (permission1 != PackageManager.PERMISSION_GRANTED || permission2 != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this,
+                        new String[] {Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.READ_EXTERNAL_STORAGE,
+                                Manifest.permission.CAMERA},
+                        REQUEST_PERMISSION_CODE);
+            }
         }
     }
 
