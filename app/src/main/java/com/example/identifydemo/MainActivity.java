@@ -19,6 +19,7 @@ import android.os.Environment;
 import android.provider.MediaStore;
 import android.util.Log;
 import android.view.View;
+import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -99,7 +100,7 @@ public class MainActivity extends AppCompatActivity {
                 Intent intentSelect = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
                 startActivityForResult(intentSelect, REQUEST_IMAGE_SELECT);
                 break;
-            case R.id.btnStartDetect:
+            case R.id.btnTake:
                 fileUri = getOutputMediaFileUri(IMAGE_CARD);
                 Intent intentTake = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
                 intentTake.putExtra(MediaStore.EXTRA_OUTPUT, fileUri);
@@ -163,6 +164,13 @@ public class MainActivity extends AppCompatActivity {
         protected void onPostExecute(IDCard idCard) {
             MainActivity activity = reference.get();
             activity.dismissDialog();
+            if (idCard == null) {
+                activity.tvResult.setText("Failed to detect text lines, result is null.");
+                return;
+            }
+            String textValue = idCard.getId();
+            Log.d(TAG, "OCR Detection succeeded.");
+            activity.tvResult.setText("Text in image: " + textValue);
         }
     }
 

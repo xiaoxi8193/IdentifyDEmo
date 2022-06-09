@@ -19,10 +19,9 @@
             android:text="@string/select_picture" />
 
         <Button
-            android:id="@+id/btnStartDetect"
+            android:id="@+id/btnTake"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:enabled="false"
             android:layout_margin="8dp"
             android:onClick="onChildClick"
             android:text="@string/detect" />
